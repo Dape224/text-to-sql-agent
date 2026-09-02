@@ -1,62 +1,146 @@
-# 🤖 Enterprise-Grade Conversational SQL Agent (with Human-in-the-Loop)
+# 📊 Nexus Logistics AI Data Analyst
 
-> **"Stop waiting on the data team. Ask your database directly, safely, and conversationally."**
+**A production-grade, Human-in-the-Loop Text-to-SQL agent with conversational memory, self-correction, and automated data visualization — delivered where teams already work: Slack and the web.**
 
-This project is a fully stateful, self-correcting AI Data Analyst that lives inside Slack. It translates natural language into SQL, executes it against a cloud Postgres database, and summarizes the results.
 
-Unlike basic LLM wrappers, this agent is built for the enterprise. It features **Human-in-the-Loop (HITL) approval flows** to prevent destructive queries, **persistent memory** for multi-turn conversations, and **full observability** to track costs and latency.
+## 🌍 The Company: Nexus Logistics Global
 
----
+Nexus Logistics Global is a fictional worldwide supply-chain and e-commerce fulfillment giant — imagine Amazon meets FedEx. It moves millions of packages daily through automated fulfillment hubs and generates continuous data across **shipping, warehouse operations, and customer experience**.
 
-## 🚀 Why This is Production-Ready
-
-Most AI tutorials stop at "text-to-SQL." This project tackles the real-world engineering challenges required to deploy an AI agent safely in a corporate environment:
-
-*   🛡️ **Human-in-the-Loop (HITL):** Using LangGraph `interrupts`, the agent pauses execution and sends interactive Slack buttons (✅ Approve / ❌ Reject) before running any query.
-*   🧠 **Self-Correction Loops:** If the agent writes invalid SQL, the database error is caught and fed back to the LLM to rewrite the query autonomously.
-*   💾 **Persistent State & Memory:** Powered by `PostgresSaver`, the agent's conversation history and paused threads survive server restarts. It understands context like *"What about Sarah's salary?"* without needing the user to repeat names.
-*   📊 **Full Observability:** Every LLM call, token, and tool execution is traced in **Langfuse**, allowing engineers to debug failures and monitor API costs in production.
-*   🔒 **Secure Integration:** Uses Slack's Socket Mode to listen for events via secure outbound WebSockets—no public IP addresses, ngrok, or exposed webhooks required.
+This project gives Nexus what every real logistics company wants: **a safe, governed way for anyone to query company data in plain English — without writing a single line of SQL.**
 
 ---
 
-## 🏗️ Architecture & Flow
+## 🗄️ The Database
 
-The system is orchestrated using **LangGraph**, utilizing a Directed Acyclic Graph (DAG) with conditional routing:
+The agent queries a realistic analytical **Postgres** database (hosted on Supabase), seeded with deterministic, production-style data: **150 shipment orders across 90 days, 8 global fulfillment hubs, and 120 daily customer-experience snapshots.**
 
-1.  **`generate_sql_node`**: Takes the user's natural language query and the database schema to write a read-only `SELECT` statement.
-2.  **`INTERRUPT`**: Execution pauses. The SQL is pushed to Slack with interactive approval buttons.
-3.  **Human Approval**: 
-    *   If ❌ **Rejected**, the graph halts.
-    *   If ✅ **Approved**, the graph resumes.
-4.  **`execute_sql_node`**: Runs the query via SQLAlchemy. If an error occurs, it routes back to Step 1 with the error message (Self-Correction).
-5.  **`summarize_node`**: Takes the raw JSON data from Postgres and prompts the LLM to write a friendly, human-readable summary.
-6.  **Output**: The final answer is posted back to the Slack channel.
+### 📦 `shipment_orders` — every package in the network
+| Column | Type | Visualization fit |
+|---|---|---|
+| `order_id` | VARCHAR (PK) | — |
+| `customer_id` | VARCHAR | — |
+| `order_timestamp` | TIMESTAMP | 📈 Line (time axis) |
+| `carrier_service` | VARCHAR | 🥧 Pie / 📊 Bar |
+| `delivery_status` | VARCHAR | 🥧 Pie |
+| `package_weight_kg` | NUMERIC | 📊 Bar |
+| `shipping_revenue_usd` | NUMERIC | 📈 Line / 📊 Bar |
+| `delivery_delay_minutes` | INTEGER | 📊 Bar |
+
+### 🏢 `fulfillment_centers` — global warehouse hubs
+| Column | Type | Visualization fit |
+|---|---|---|
+| `hub_id` / `hub_name` | VARCHAR | 📊 Bar (labels) |
+| `global_region` | VARCHAR | 🥧 Pie |
+| `total_active_robots` | INTEGER | 📊 Bar |
+| `warehouse_capacity_pct` | NUMERIC | 📊 Bar |
+| `daily_processed_packages` | INTEGER | 📊 Bar |
+
+### 🙂 `customer_experience_metrics` — daily user & support telemetry
+| Column | Type | Visualization fit |
+|---|---|---|
+| `snapshot_date` | DATE | 📈 Line (time axis) |
+| `platform_type` | VARCHAR | 🥧 Pie |
+| `support_ticket_category` | VARCHAR | 📊 Bar |
+| `average_csat_score` | NUMERIC | 📈 Line |
+| `active_users_count` | INTEGER | 📈 Line |
 
 ---
 
-## 🛠️ Tech Stack
+## 🤖 What the Agent Can Do
 
-*   **Orchestration:** LangGraph, LangChain
-*   **Database & Checkpointer:** Supabase (Postgres) + `psycopg_pool`
-*   **Database Toolkit:** SQLAlchemy (Database-agnostic schema inspection & execution)
-*   **User Interface:** Slack Bolt (Socket Mode)
-*   **LLM Provider:** OpenAI (`gpt-4o`)
-*   **Observability:** Langfuse
-*   **Deployment:** Render / Docker
+- **Plain-English → SQL:** Translates natural questions into safe, read-only `SELECT` queries using the live database schema.
+- **Human-in-the-Loop governance:** Every query pauses and requires explicit ✅ Approve / ❌ Reject before touching the database.
+- **Self-correction:** If SQL fails, the error is fed back to the LLM, which rewrites the query autonomously.
+- **Conversational memory:** Remembers context across turns ("What about Sarah?" → knows who you mean). Survives server restarts via a Postgres checkpointer.
+- **Automated visualization:** Detects chart intent and renders **bar / pie / line** charts with matplotlib, delivered inline.
+- **Natural-language insights:** Raw rows are summarized into friendly, executive-ready answers.
+- **Full observability:** Every LLM call, token, and latency is traced in **Langfuse**.
+- **Two surfaces:** Lives in **Slack** (Socket Mode, interactive buttons) and as a **Streamlit web app**.
 
 ---
 
-## ⚙️ Local Setup & Installation
+## 🏗️ Architecture
 
-### 1. Prerequisites
-*   Python 3.10+
-*   A free [Supabase](https://supabase.com) project (for Postgres)
-*   A free [Langfuse](https://cloud.langfuse.com) account (for tracing)
-*   A [Slack App](https://api.slack.com/apps) with Socket Mode enabled.
+### Agent workflow
+```mermaid
+flowchart TD
+    U[User asks in Slack or Web UI] --> G[generate_sql_node: LLM writes SQL]
+    G --> H{Human-in-the-Loop: Approve?}
+    H -- Reject --> R[Stop: ask a new question]
+    H -- Approve --> E[execute_sql_query: run on Supabase]
+    E -- SQL error --> G
+    E -- Success --> S[summary_node: LLM writes insight]
+    S --> C{route_after_summary: wants a chart?}
+    C -- Yes --> V[visualize_node: matplotlib renders PNG]
+    V --> UP[Deliver insight + chart]
+    C -- No --> P[Deliver insight]
+```
 
-### 2. Install Dependencies
+### System components
+```mermaid
+flowchart LR
+    SL[Slack - Socket Mode] <--> LG[LangGraph Orchestrator]
+    WEB[Streamlit Web UI] <--> LG
+    LG --> LLM[OpenAI LLM]
+    LG --> DB[(Supabase Postgres: data + memory)]
+    LG --> LF[Langfuse Observability]
+    LG --> MP[matplotlib Chart Engine]
+```
+
+---
+
+## ✅ Why This Is a Real-World, Production Project
+
+| Concern | How it's solved |
+|---|---|
+| **Safety / governance** | HITL approval before every query; read-only SQL only |
+| **Reliability** | Self-correction loop; persistent Postgres checkpointer survives restarts |
+| **Scalability** | Connection pooling (`psycopg_pool`); Supabase transaction pooler |
+| **Debuggability** | Langfuse tracing of prompts, tokens, latency, and failures |
+| **Portability** | SQLAlchemy abstraction — swap DuckDB/Postgres/Snowflake by changing one URL |
+| **Security** | Slack Socket Mode (outbound WebSocket, no public URL); secrets in env vars |
+| **Deployment** | Cloud-hosted on Render (bot + web UI), Supabase, Langfuse Cloud |
+
+---
+
+## 🧪 Try It — Sample Questions
+
+**Plain data:** "What is our total shipping revenue?" • "Which hub processes the most packages?" • "How many orders are delayed?"
+
+**Bar:** "Show me a bar chart of daily processed packages by hub name"
+
+**Pie:** "Show me a pie chart of shipment orders by delivery status"
+
+**Line:** "Show me a line chart of total active users over time"
+
+---
+
+## ⚙️ Local Setup
+
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 pip install -r requirements.txt
+```
+
+`.env`:
+```
+OPENAI_API_KEY=...
+DATABASE_URL=postgresql://...(Supabase transaction pooler)
+SLACK_BOT_TOKEN=xoxb-...
+SLACK_APP_TOKEN=xapp-...
+LANGFUSE_PUBLIC_KEY=...
+LANGFUSE_SECRET_KEY=...
+LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+Run the surfaces:
+```bash
+python slack_bot.py      # Slack bot
+streamlit run app.py     # Web UI
+```
+
+---
+
+## 👨🏾‍💻 About the Author
+
+Built by **Oladapo** — AI/Full-Stack Engineer specializing in production LLM systems, LangGraph orchestration, and data tooling. Open to freelance projects and full-time roles building enterprise AI agents.
