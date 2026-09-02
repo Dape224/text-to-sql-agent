@@ -1,6 +1,9 @@
 import os
 import re
 import uuid
+import threading
+from fastapi import FastAPI
+import uvicorn
 from dotenv import load_dotenv
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -16,6 +19,15 @@ app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 langfuse_handler = CallbackHandler()
 
+web = FastAPI()
+
+@web.get("/")
+def heartbeat():
+    return {"status": "alive"}   
+
+def run_web():
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(web, host="0.0.0.0", port=port)
 
 @app.event("app_mention")
 def handle_mention(event, say):
@@ -110,6 +122,9 @@ def handle_reject(ack, body, client):
 
 
 if __name__ == "__main__":
+    threading.Thread(target=run_web, daemon=True).start()
+
     handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
     print("⚡ Slack bot is running...")
     handler.start()
+
