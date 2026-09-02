@@ -1,0 +1,15 @@
+# Ignore environment variables (NEVER push passwords)
+.env
+
+# Ignore Python virtual environment
+venv/
+.venv/
+
+# Ignore old local database files
+*.db
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+
+matplot.py
