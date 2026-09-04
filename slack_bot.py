@@ -138,5 +138,5 @@ if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
 
     handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
-    print("⚡ Slack bot is running...")
+    print("Slack bot is running...")
     handler.start()
