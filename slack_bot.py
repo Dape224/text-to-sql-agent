@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 import threading
+import warnings  
 from fastapi import FastAPI
 import uvicorn
 from dotenv import load_dotenv
@@ -13,12 +14,13 @@ from langfuse.langchain import CallbackHandler
 from agent import analyst
 from conn import setup_db_and_get_schema
 
+warnings.filterwarnings("ignore", message=".*automatic function calling.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf")
+
 load_dotenv()
 
 app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
-
 langfuse_handler = CallbackHandler()
-
 web = FastAPI()
 
 @web.get("/")
@@ -28,6 +30,12 @@ def heartbeat():
 def run_web():
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(web, host="0.0.0.0", port=port)
+
+
+@app.event("message")
+def handle_message_events(body, logger):
+    """Acknowledges general room chatter so logs stay completely clean."""
+    pass
 
 @app.event("app_mention")
 def handle_mention(event, say):
@@ -39,8 +47,8 @@ def handle_mention(event, say):
         return
 
     thread_id = str(uuid.uuid4())
-
     schema = setup_db_and_get_schema()
+    
     initial_state = {
         "user_query": question,
         "database_schema": schema,
@@ -53,15 +61,14 @@ def handle_mention(event, say):
     }
 
     output = analyst.invoke(initial_state, config=config)
-    sql = output["agent_sql"]
+    sql = output.get("agent_sql", "No SQL generated")
 
     say(
         text=f"Generated SQL for: {question}",
         blocks=[
             {
                 "type": "section",
-                "text": {"type": "mrkdwn",
-                         "text": f"*Generated SQL:*\n```{sql}```\nDo you approve?"},
+                "text": {"type": "mrkdwn", "text": f"*Generated SQL:*\n```{sql}```\nDo you approve?"},
             },
             {
                 "type": "actions",
@@ -85,11 +92,8 @@ def handle_mention(event, say):
         ],
     )
 
-
-@app.action("approve_sql")
-def handle_approve(ack, body, client):
-    ack()
-
+def process_approval_in_background(body, client):
+    """Executes heavy DB query and LLM summary safely off the main Slack thread."""
     thread_id = body["actions"][0]["value"]
     channel_id = body["channel"]["id"]
     config = {"configurable": {"thread_id": thread_id}}
@@ -111,6 +115,16 @@ def handle_approve(ack, body, client):
     else:
         client.chat_postMessage(channel=channel_id, text=f"📊 {answer}")
 
+@app.action("approve_sql")
+def handle_approve(ack, body, client):
+    ack()  
+   
+    threading.Thread(
+        target=process_approval_in_background, 
+        args=(body, client), 
+        daemon=True
+    ).start()
+
 @app.action("reject_sql")
 def handle_reject(ack, body, client):
     ack()
@@ -120,11 +134,9 @@ def handle_reject(ack, body, client):
         text="❌ SQL rejected. Ask me a different question!",
     )
 
-
 if __name__ == "__main__":
     threading.Thread(target=run_web, daemon=True).start()
 
     handler = SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN"))
     print("⚡ Slack bot is running...")
     handler.start()
-
