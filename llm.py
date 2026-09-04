@@ -1,14 +1,14 @@
 import os
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
-api_key= os.getenv("MISTRAL_API_KEY")
+api_key= os.getenv("GEMINI_API_KEY")
 
 
 def brain():
-    llm = ChatMistralAI(
-        model= "mistral-medium-2505",
+    llm = ChatGoogleGenerativeAI(
+        model= "gemini-2.5-flash"",
         api_key= api_key
     )
     return llm
