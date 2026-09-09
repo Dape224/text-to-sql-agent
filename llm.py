@@ -1,14 +1,16 @@
 import os
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 load_dotenv()
-api_key= os.getenv("GEMINI_API_KEY")
+api_key= os.getenv("GROQ_API_KEY")
 
 
 def brain():
-    llm = ChatGoogleGenerativeAI(
-        model= "gemini-3.6-flash",
-        api_key= api_key
+    llm = ChatGroq(
+        model= "openai/gpt-oss-20b",
+        api_key= api_key,
+        temperature= 0
     )
     return llm
+
